@@ -4,6 +4,8 @@ class TWMOEDict {
 	private $o = "";
 	private $ccd = "";
 	private $sec = "";
+	private $ok = false;
+	private $status = [];
 
 	function __construct() {
 		include(__DIR__.'/config.php');
@@ -13,33 +15,50 @@ class TWMOEDict {
 		}
 		$res = cURL("http://dict.revised.moe.edu.tw/cbdic/search.htm", false, $this->cookiepath);
 		if ($res === false) {
-			return ["error"=>1];
+			$this->status = ["error"=>1];
+			return;
 		}
 		preg_match("/<a href=\"\/cgi-bin\/cbdic\/gsweb\.cgi\/\?&o=(.*?)&\" title/", $res, $m);
 		$this->o = $m[1];
 		$res = cURL("http://dict.revised.moe.edu.tw/cgi-bin/cbdic/gsweb.cgi/?&o={$this->o}&", false, $this->cookiepath);
 		if ($res === false) {
-			return ["error"=>2];
+			$this->status = ["error"=>2];
+			return;
 		}
 		if (preg_match("/<a href=\"\/cgi-bin\/cbdic\/gsweb\.cgi\?ccd=(.*?)&o=(.*?)&sec=(.*?)&index=.*?\" title/", $res, $m)) {
 			$this->ccd = $m[1];
 			$this->o = $m[2];
 			$this->sec = $m[3];
 		} else {
-			return ["error"=>3];
+			$this->status = ["error"=>3];
+			return;
 		}
+		$this->ok = true;
+		$this->status = ["ok"=>null];
+	}
+	function status() {
+		return $this->status;
+	}
+	function cookiepath() {
+		return $this->cookiepath;
 	}
 	function search($word, $onlylist = false) {
+		if ($this->ok === false) {
+			$this->status = ["error"=>5];
+			return $this->status;
+		}
 		$post = array(
 			"o" => $this->o,
 			"ccd" => $this->ccd,
 			"sec" => $this->sec,
 			"selectmode" => "mode1",
-			"qs0" => $word
+			"qs0" => $word,
+			"psize" => "100"
 		);
 		$res = cURL("http://dict.revised.moe.edu.tw/cgi-bin/cbdic/gsweb.cgi", $post, $this->cookiepath);
 		if ($res === false) {
-			return ["error"=>4];
+			$this->status = ["error"=>4];
+			return $this->status;
 		}
 		$mulit = preg_match("/正文資料<font class=numfont>(\d+)<\/font>則/", $res, $m);
 		if ($mulit) {
